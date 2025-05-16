@@ -67,3 +67,13 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# 🔐 Firebase credentials
+serviceAccountKey.json
+
+# 🧠 База данных
+*.db
+*.db-journal
+
+# 🛠️ Сборка фронтенда (Vite, React)
+dist/
