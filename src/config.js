@@ -1,0 +1,1 @@
+export const API_URL = "https://sqlite-api-tnid.onrender.com";

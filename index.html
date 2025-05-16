@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SecureShop</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  
+  <script>
+    function onTelegramAuth(user) {
+      console.log("Telegram user:", user);
+      localStorage.setItem("tgUser", JSON.stringify(user));
+      window.location.href = "/profile";
+    }
+  </script>
+   
+  </body>
+</html>
