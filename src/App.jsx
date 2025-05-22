@@ -16,10 +16,9 @@ import Catalog from "./pages/Catalog";
 import Cart from "./pages/Cart";
 import SearchPage from "./pages/Search";
 import Checkout from "./pages/Checkout";
-import Admin from "./pages/Admin";
+//import Admin from "./pages/Admin";
 
 import DropdownMenu from "./components/DropdownMenu";
-import ChatBot from "./components/ChatBot";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -136,17 +135,11 @@ export default function App() {
         <Route path="/cart" element={<Cart />} />
         <Route path="/checkout" element={<Checkout />} />
 
-        <Route
-          path="/admin"
-          element={
-            <ProtectedAdminRoute>
-              <Admin />
-            </ProtectedAdminRoute>
-          }
-        />
+    
+
       </Routes>
 
-      <ChatBot />
+      
     </div>
   );
 }

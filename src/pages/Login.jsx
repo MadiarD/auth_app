@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "../firebase";
@@ -11,7 +11,7 @@ export default function Login() {
 
   const handleEmailLogin = async () => {
     try {
-      const res = await fetch("https://backend-service-p8bw.onrender.com/api/login", {
+      const res = await fetch("https://secure-shop.onrender.com/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: emailOrPhone, password }),
@@ -43,7 +43,7 @@ export default function Login() {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
 
-      await fetch("https://backend-service-p8bw.onrender.com/api/social-login", {
+      await fetch("https://secure-shop.onrender.com/api/social-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -59,6 +59,36 @@ export default function Login() {
       console.error("Ошибка входа через Google:", error);
     }
   };
+
+  useEffect(() => {
+    window.onTelegramAuth = async function (user) {
+      try {
+        const res = await fetch("https://secure-shop.onrender.com/api/social-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: user.id,
+            name: user.first_name,
+            username: user.username,
+            provider: "telegram"
+          }),
+        });
+
+        const data = await res.json();
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("isAdmin", data.isAdmin);
+
+        if (data.isAdmin) {
+          window.location.href = "/admin";
+        } else {
+          window.location.href = "/profile";
+        }
+      } catch (err) {
+        console.error("Ошибка Telegram входа:", err);
+        alert("Ошибка авторизации через Telegram");
+      }
+    };
+  }, []);
 
   return (
     <div className="flex justify-center items-center min-h-screen bg-light dark:bg-dark text-textLight dark:text-textDark">

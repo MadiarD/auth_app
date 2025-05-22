@@ -1,11 +1,24 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 
-const Profile = () => {
-  const user = {
-    name: "Иван Иванов",
-    email: "ivan@example.com",
-    provider: "Google", // Пример: через какую соцсеть вошёл
-  };
+export default function Profile() {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    if (!token) return;
+
+    fetch("https://secure-shop.onrender.com/api/profile", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then((res) => res.json())
+      .then((data) => setUser(data))
+      .catch((err) => console.error("Ошибка загрузки профиля:", err));
+  }, []);
+
+  if (!user) return <p className="text-center mt-10">Загрузка...</p>;
 
   return (
     <div className="p-8 max-w-md mx-auto">
@@ -16,21 +29,21 @@ const Profile = () => {
           alt="Аватар"
           className="rounded-full mb-4"
         />
-        <p className="mb-2">
-          <strong>Имя:</strong> {user.name}
-        </p>
-        <p className="mb-2">
-          <strong>Email:</strong> {user.email}
-        </p>
-        <p>
-          <strong>Соцсеть:</strong> {user.provider}
-        </p>
-        <button className="mt-4 w-full bg-gray-300 dark:bg-gray-600 text-black dark:text-white py-2 rounded hover:opacity-90">
+        <p className="mb-2"><strong>Имя:</strong> {user.name}</p>
+        <p className="mb-2"><strong>Email:</strong> {user.email || "—"}</p>
+        <p><strong>Соцсеть:</strong> {user.provider || "—"}</p>
+
+        <button
+          onClick={() => {
+            localStorage.removeItem("token");
+            localStorage.removeItem("isAdmin");
+            window.location.href = "/login";
+          }}
+          className="mt-4 w-full bg-gray-300 dark:bg-gray-600 text-black dark:text-white py-2 rounded hover:opacity-90"
+        >
           Выйти
         </button>
       </div>
     </div>
   );
-};
-
-export default Profile;
+}
