@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
 const axios = require("axios");
-const rateLimit = require("express-rate-limit"); // Добавляем rate limiting
+const rateLimit = require("express-rate-limit");
 const db = require("./users/db");
 
 const app = express();
@@ -25,14 +25,24 @@ const corsOptions = {
   methods: ["GET", "POST", "OPTIONS"],
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 200, // Поддержка префлайт-запросов
 };
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+app.options("*", cors(corsOptions)); // Обработка префлайт-запросов
 
 // Проверка HTTPS
 app.use((req, res, next) => {
   if (req.get("x-forwarded-proto") !== "https" && process.env.NODE_ENV === "production") {
     return res.redirect(301, `https://${req.get("host")}${req.url}`);
+  }
+  next();
+});
+
+// Защита от CSRF
+app.use((req, res, next) => {
+  const referer = req.get("Referer");
+  if (req.path.startsWith("/api") && referer && !referer.includes("projectd-9c1fa.web.app")) {
+    return res.status(403).send("Forbidden: Invalid Referer");
   }
   next();
 });
@@ -66,7 +76,7 @@ app.post("/api/register", loginLimiter, async (req, res) => {
     if (!name) throw new Error("Поле name обязательно");
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const id = Date.now().toString(); // Рекомендую заменить на uuid
+    const id = Date.now().toString();
 
     const query = `INSERT INTO users (id, name, email, password, provider) VALUES (?, ?, ?, ?, ?)`;
     db.run(query, [id, name, email, hashedPassword, "local"], function (err) {
@@ -103,7 +113,7 @@ app.post("/api/login", loginLimiter, async (req, res) => {
     await db.run("UPDATE users SET isAdmin = ? WHERE email = ?", [isAdmin, email]);
 
     const token = jwt.sign({ id: user.id, email, isAdmin }, process.env.JWT_SECRET, {
-      expiresIn: "1h", // Уменьшен срок действия токена
+      expiresIn: "1h",
     });
 
     res.json({ token, isAdmin });
@@ -123,13 +133,11 @@ app.post("/api/social-login", loginLimiter, async (req, res) => {
     let isAdmin = email === "mkoishyn@mail.ru";
 
     if (provider === "google") {
-      // Валидация Firebase токена
       const decodedToken = await admin.auth().verifyIdToken(token);
       if (decodedToken.uid !== id) {
         return res.status(401).send("Invalid Google token");
       }
     } else if (provider === "telegram") {
-      // Проверка подписи Telegram
       const botToken = process.env.TELEGRAM_BOT_TOKEN;
       if (!hash) throw new Error("Telegram hash отсутствует");
       const dataCheckString = Object.keys(req.body)
@@ -172,7 +180,7 @@ app.post("/api/social-login", loginLimiter, async (req, res) => {
   }
 });
 
-// Mail.ru авторизация
+// Вход/регистрация через Mail.ru
 app.post("/api/social-login/mailru", loginLimiter, async (req, res) => {
   try {
     const { code } = req.body;
@@ -182,7 +190,6 @@ app.post("/api/social-login/mailru", loginLimiter, async (req, res) => {
     const clientSecret = process.env.MAILRU_CLIENT_SECRET;
     const redirectUri = "https://projectd-9c1fa.web.app/auth/mailru-callback";
 
-    // Обмен code на access token
     const tokenResponse = await axios.post("https://o2.mail.ru/token", {
       client_id: clientId,
       client_secret: clientSecret,
@@ -192,13 +199,11 @@ app.post("/api/social-login/mailru", loginLimiter, async (req, res) => {
     });
 
     const accessToken = tokenResponse.data.access_token;
-    // Получение данных пользователя
     const userResponse = await axios.get(`https://o2.mail.ru/userinfo?access_token=${accessToken}`);
     const userData = userResponse.data;
 
     const isAdmin = userData.email === "mkoishyn@mail.ru";
 
-    // Проверка/создание пользователя
     const existingUser = await db.get(
       "SELECT * FROM users WHERE id = ? OR email = ?",
       [userData.id, userData.email]
@@ -213,7 +218,6 @@ app.post("/api/social-login/mailru", loginLimiter, async (req, res) => {
       await db.run("UPDATE users SET isAdmin = ? WHERE id = ?", [isAdmin, userData.id]);
     }
 
-    // Создание Firebase кастомного токена
     const firebaseToken = await admin.auth().createCustomToken(userData.id, {
       email: userData.email,
       name: userData.name,
@@ -229,6 +233,19 @@ app.post("/api/social-login/mailru", loginLimiter, async (req, res) => {
   } catch (error) {
     console.error("Ошибка Mail.ru:", error.message);
     res.status(400).send("Mail.ru auth failed");
+  }
+});
+
+// Новый маршрут для профиля
+app.get("/api/profile", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await db.get("SELECT * FROM users WHERE id = ?", [decoded.id]);
+    if (!user) return res.status(404).send("User not found");
+    res.json({ id: user.id, name: user.name, email: user.email, isAdmin: user.isAdmin });
+  } catch (error) {
+    res.status(401).send("Invalid token");
   }
 });
 
