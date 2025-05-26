@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
@@ -7,10 +8,15 @@ const admin = require("firebase-admin");
 const crypto = require("crypto");
 const axios = require("axios");
 const rateLimit = require("express-rate-limit");
-const db = require("./users/db");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Проверка переменных окружения
+if (!process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.JWT_SECRET) {
+  console.error("❌ Ошибка: отсутствуют переменные окружения");
+  process.exit(1);
+}
 
 // Rate Limiting
 const loginLimiter = rateLimit({
@@ -30,7 +36,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
-// HTTPS проверка
+// HTTPS редирект
 app.use((req, res, next) => {
   if (req.get("x-forwarded-proto") !== "https" && process.env.NODE_ENV === "production") {
     return res.redirect(301, `https://${req.get("host")}${req.url}`);
@@ -49,16 +55,14 @@ app.use((req, res, next) => {
 
 app.use(bodyParser.json());
 
-// Firebase Admin SDK
+// Инициализация Firebase Admin
+const serviceAccount = require("./firebase-adminsdk.json");
+
 admin.initializeApp({
-  credential: admin.credential.cert({
-    projectId: "projectd-9c1fa",
-    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-  }),
+  credential: admin.credential.cert(serviceAccount),
 });
 
-// Input validation
+// Утилита валидации
 const validateInput = (data, requiredFields) => {
   for (const field of requiredFields) {
     if (!data[field] || typeof data[field] !== "string") {
@@ -70,7 +74,6 @@ const validateInput = (data, requiredFields) => {
 // 📌 Вход по email/паролю
 app.post("/api/login", loginLimiter, async (req, res) => {
   const { email, password } = req.body;
-
   try {
     validateInput({ email, password }, ["email", "password"]);
     const user = await db.get("SELECT * FROM users WHERE email = ?", [email]);
@@ -96,7 +99,6 @@ app.post("/api/login", loginLimiter, async (req, res) => {
 // 📌 Регистрация
 app.post("/api/register", loginLimiter, async (req, res) => {
   const { name, email, password } = req.body;
-
   try {
     validateInput({ email, password }, ["email", "password"]);
     if (!name) throw new Error("Поле name обязательно");
@@ -131,10 +133,7 @@ app.post("/api/google-login", loginLimiter, async (req, res) => {
     const provider = "google";
     const uid = decoded.uid;
 
-    const existingUser = await db.get("SELECT * FROM users WHERE id = ? OR email = ?", [
-      uid,
-      email,
-    ]);
+    const existingUser = await db.get("SELECT * FROM users WHERE id = ? OR email = ?", [uid, email]);
 
     if (!existingUser) {
       await db.run(
@@ -156,7 +155,7 @@ app.post("/api/google-login", loginLimiter, async (req, res) => {
   }
 });
 
-// 📌 Социальный вход (Telegram, Google, Mail.ru)
+// 📌 Соцвход (Google, Telegram)
 app.post("/api/social-login", loginLimiter, async (req, res) => {
   const { id, name, username, provider, email, token, hash } = req.body;
 
@@ -226,6 +225,11 @@ app.get("/api/profile", async (req, res) => {
   }
 });
 
+// 📌 Подключение дополнительных маршрутов (например, save-user)
+const userRoutes = require("./users");
+app.use("/api", userRoutes);
+
+// Запуск сервера
 app.listen(PORT, () => {
   console.log(`✅ Сервер запущен на http://localhost:${PORT}`);
 });

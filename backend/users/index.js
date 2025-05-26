@@ -1,6 +1,9 @@
 const express = require("express");
-const db = require("../db");
+const db = require("./db");
 const router = express.Router();
+
+console.log("✅ Загружен users/index.js:", __filename);
+
 
 router.post("/save-user", (req, res) => {
   const { id, name, email, provider } = req.body;
