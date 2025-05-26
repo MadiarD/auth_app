@@ -1,40 +1,38 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "../firebase";
-import TelegramLoginButton from "../components/TelegramLoginButton";
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { auth, googleProvider } from '../firebase';
+import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 
-export default function Login() {
+const Login = () => {
   const navigate = useNavigate();
-  const [emailOrPhone, setEmailOrPhone] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
-  const handleEmailLogin = async () => {
+  const handleEmailLogin = async (e) => {
+    e.preventDefault();
     try {
-      const res = await fetch("https://secure-shop.onrender.com/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: emailOrPhone, password }),
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const user = result.user;
+      const token = await user.getIdToken();
+
+      const response = await fetch('https://secure-shop.onrender.com/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
       });
 
-      if (!res.ok) {
-        const error = await res.text();
-        alert("Ошибка входа: " + error);
-        return;
-      }
+      const data = await response.json();
 
-      const data = await res.json();
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("isAdmin", data.isAdmin);
-
-      if (data.isAdmin) {
-        navigate("/admin");
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+        navigate('/profile');
       } else {
-        navigate("/profile");
+        setError('Ошибка сервера при авторизации');
       }
-    } catch (error) {
-      console.error("Ошибка при входе:", error);
-      alert("Ошибка входа.");
+    } catch (err) {
+      console.error('Ошибка входа:', err);
+      setError('Неверный email или пароль');
     }
   };
 
@@ -43,108 +41,77 @@ export default function Login() {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
 
-      await fetch("https://secure-shop.onrender.com/api/social-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: user.uid,
-          name: user.displayName,
-          email: user.email,
-          provider: "google",
-        }),
+      const token = await user.getIdToken();
+      console.log('🔥 Firebase ID Token:', token); // <-- отладка
+
+      const response = await fetch('https://secure-shop.onrender.com/api/google-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
       });
 
-      navigate("/profile");
-    } catch (error) {
-      console.error("Ошибка входа через Google:", error);
+      const data = await response.json();
+      console.log('🌐 Ответ от backend:', data); // <-- отладка
+
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+        navigate('/profile');
+      } else {
+        console.error('❌ Сервер не вернул token');
+        setError('Ошибка: токен не получен от сервера');
+      }
+    } catch (err) {
+      console.error('🚫 Ошибка входа через Google:', err);
+      setError('Ошибка входа через Google');
     }
   };
 
-  useEffect(() => {
-    window.onTelegramAuth = async function (user) {
-      try {
-        const res = await fetch("https://secure-shop.onrender.com/api/social-login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: user.id,
-            name: user.first_name,
-            username: user.username,
-            provider: "telegram"
-          }),
-        });
-
-        const data = await res.json();
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("isAdmin", data.isAdmin);
-
-        if (data.isAdmin) {
-          window.location.href = "/admin";
-        } else {
-          window.location.href = "/profile";
-        }
-      } catch (err) {
-        console.error("Ошибка Telegram входа:", err);
-        alert("Ошибка авторизации через Telegram");
-      }
-    };
-  }, []);
-
   return (
-    <div className="flex justify-center items-center min-h-screen bg-light dark:bg-dark text-textLight dark:text-textDark">
-      <div className="bg-white dark:bg-cardDark p-8 rounded-lg shadow-md w-full max-w-md text-center">
-        <h2 className="text-xl font-bold mb-6">Log in / Register</h2>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+      <div className="bg-white dark:bg-gray-800 p-8 rounded shadow-md w-full max-w-md">
+        <h2 className="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-white">Вход</h2>
+        {error && <p className="text-red-500 mb-4">{error}</p>}
 
-        <input
-          type="text"
-          placeholder="Email"
-          className="w-full px-4 py-3 mb-3 bg-gray-100 dark:bg-dark border border-gray-300 rounded"
-          value={emailOrPhone}
-          onChange={(e) => setEmailOrPhone(e.target.value)}
-        />
+        <form onSubmit={handleEmailLogin} className="space-y-4">
+          <input
+            type="email"
+            placeholder="Email"
+            className="w-full px-4 py-2 border rounded"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
 
-        <input
-          type="password"
-          placeholder="Password"
-          className="w-full px-4 py-3 mb-4 bg-gray-100 dark:bg-dark border border-gray-300 rounded"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+          <input
+            type="password"
+            placeholder="Пароль"
+            className="w-full px-4 py-2 border rounded"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
 
-        <div className="flex items-center mb-4">
-          <input type="checkbox" id="stayLogged" className="mr-2" />
-          <label htmlFor="stayLogged" className="text-sm opacity-70">
-            Stay logged in
-          </label>
-        </div>
+          <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
+            Войти
+          </button>
+        </form>
 
-        <button
-          onClick={handleEmailLogin}
-          className="w-full bg-black text-white py-3 rounded-full text-lg font-semibold hover:bg-gray-800 transition"
-        >
-          Next
-        </button>
-
-        <div className="my-6 space-y-3">
-          <TelegramLoginButton />
-
+        <div className="mt-6 flex flex-col gap-3">
           <button
             onClick={handleGoogleLogin}
-            className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded text-base font-medium"
+            className="w-full bg-red-500 text-white py-2 rounded hover:bg-red-600"
           >
             Войти через Google
           </button>
-        </div>
 
-        <div className="text-sm underline space-y-1 mt-4">
-          <p className="hover:text-accent cursor-pointer">Access with code</p>
-          <p className="hover:text-accent cursor-pointer">Reset my password</p>
+          {/* Место для кнопки Telegram */}
+          <div id="telegram-login-container" className="mt-2 flex justify-center">
+            {/* Кнопка будет добавлена позже */}
+          </div>
         </div>
-
-        <p className="text-xs text-gray-400 mt-6">
-          Мы используем указанный адрес электронной почты, чтобы отправить тебе проверочный код.
-        </p>
       </div>
     </div>
   );
-}
+};
+
+export default Login;

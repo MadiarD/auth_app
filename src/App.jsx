@@ -11,12 +11,13 @@ import {
 
 import Home from "./pages/Home";
 import Login from "./pages/Login";
+import Register from "./pages/Register"; // ← добавлено
 import Profile from "./pages/Profile";
 import Catalog from "./pages/Catalog";
 import Cart from "./pages/Cart";
 import SearchPage from "./pages/Search";
 import Checkout from "./pages/Checkout";
-//import Admin from "./pages/Admin";
+// import Admin from "./pages/Admin";
 
 import DropdownMenu from "./components/DropdownMenu";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
@@ -85,13 +86,22 @@ export default function App() {
           </Link>
 
           {!token && (
-            <Link
-              to="/login"
-              className="flex items-center border border-borderLight dark:border-borderDark rounded-full px-4 py-1 text-sm hover:bg-white dark:hover:bg-cardDark transition"
-            >
-              <User size={16} className="mr-2" />
-              <span>Войти</span>
-            </Link>
+            <>
+              <Link
+                to="/login"
+                className="flex items-center border border-borderLight dark:border-borderDark rounded-full px-4 py-1 text-sm hover:bg-white dark:hover:bg-cardDark transition"
+              >
+                <User size={16} className="mr-2" />
+                <span>Войти</span>
+              </Link>
+
+              <Link
+                to="/register"
+                className="flex items-center border border-green-500 text-green-600 rounded-full px-4 py-1 text-sm hover:bg-green-50 transition"
+              >
+                Зарегистрироваться
+              </Link>
+            </>
           )}
 
           {token && (
@@ -120,6 +130,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
         <Route
           path="/profile"
@@ -134,12 +145,7 @@ export default function App() {
         <Route path="/search" element={<SearchPage />} />
         <Route path="/cart" element={<Cart />} />
         <Route path="/checkout" element={<Checkout />} />
-
-    
-
       </Routes>
-
-      
     </div>
   );
 }
