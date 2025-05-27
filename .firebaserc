@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "projectd-9c1fa"
-  }
+    "default": "auth-1ba03"
+  },
+  "targets": {},
+  "etags": {}
 }

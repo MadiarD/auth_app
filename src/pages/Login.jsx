@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, googleProvider } from '../firebase';
 import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
@@ -9,6 +9,24 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
+  const API = import.meta.env.VITE_API_URL;
+
+  useEffect(() => {
+    // Telegram Login Widget
+    const script = document.createElement('script');
+    script.src = 'https://telegram.org/js/telegram-widget.js?22';
+    script.setAttribute('data-telegram-login', 'auth_02_bot');
+    script.setAttribute('data-size', 'large');
+    script.setAttribute('data-userpic', 'false');
+    script.setAttribute('data-request-access', 'write');
+    script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+    script.async = true;
+
+    const container = document.getElementById('telegram-login-container');
+    if (container) container.appendChild(script);
+  }, []);
+
+  
   const handleEmailLogin = async (e) => {
     e.preventDefault();
     try {
@@ -16,14 +34,13 @@ const Login = () => {
       const user = result.user;
       const token = await user.getIdToken();
 
-      const response = await fetch('https://secure-shop.onrender.com/api/login', {
+      const response = await fetch(`${API}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
       });
 
       const data = await response.json();
-
       if (data.token) {
         localStorage.setItem('token', data.token);
         navigate('/profile');
@@ -40,29 +57,53 @@ const Login = () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-
       const token = await user.getIdToken();
-      console.log('🔥 Firebase ID Token:', token); // <-- отладка
 
-      const response = await fetch('https://secure-shop.onrender.com/api/google-login', {
+      const response = await fetch(`${API}/api/google-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
       });
 
       const data = await response.json();
-      console.log('🌐 Ответ от backend:', data); // <-- отладка
-
       if (data.token) {
         localStorage.setItem('token', data.token);
         navigate('/profile');
       } else {
-        console.error('❌ Сервер не вернул token');
         setError('Ошибка: токен не получен от сервера');
       }
     } catch (err) {
-      console.error('🚫 Ошибка входа через Google:', err);
+      console.error('Ошибка входа через Google:', err);
       setError('Ошибка входа через Google');
+    }
+  };
+
+  // Глобальная функция Telegram
+  window.onTelegramAuth = async function (user) {
+    try {
+      const response = await fetch(`${API}/api/social-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: user.id,
+          name: user.first_name,
+          username: user.username,
+          provider: 'telegram',
+          email: user.email || null,
+          hash: user.hash,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+        navigate('/profile');
+      } else {
+        setError('Ошибка Telegram-входа');
+      }
+    } catch (err) {
+      console.error('Ошибка Telegram входа:', err);
+      setError('Ошибка Telegram входа');
     }
   };
 
@@ -81,7 +122,6 @@ const Login = () => {
             onChange={(e) => setEmail(e.target.value)}
             required
           />
-
           <input
             type="password"
             placeholder="Пароль"
@@ -90,7 +130,6 @@ const Login = () => {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
-
           <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
             Войти
           </button>
@@ -104,10 +143,7 @@ const Login = () => {
             Войти через Google
           </button>
 
-          {/* Место для кнопки Telegram */}
-          <div id="telegram-login-container" className="mt-2 flex justify-center">
-            {/* Кнопка будет добавлена позже */}
-          </div>
+          <div id="telegram-login-container" className="mt-2 flex justify-center"></div>
         </div>
       </div>
     </div>

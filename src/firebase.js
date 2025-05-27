@@ -3,15 +3,14 @@ import { getAuth, GoogleAuthProvider, FacebookAuthProvider } from "firebase/auth
 
 // Конфигурация твоего Firebase-проекта 
 const firebaseConfig = {
-  apiKey: "AIzaSyCHdf1KK-No4pN-obPoc_GvNhvO7d2lUSE",
-  authDomain: "projectd-9c1fa.firebaseapp.com",
-  projectId: "projectd-9c1fa",
-  storageBucket: "projectd-9c1fa.appspot.com", 
-  messagingSenderId: "914938764845",
-  appId: "1:914938764845:web:891ed5cdc06a46b0b262a4",
-  measurementId: "G-QJS4GHN782"
+  apiKey: "AIzaSyDYyBOJO5S2BUURXmBsDqZ5fpsN4l_hG1g",
+  authDomain: "auth-1ba03.firebaseapp.com",
+  projectId: "auth-1ba03",
+  storageBucket: "auth-1ba03.firebasestorage.app",
+  messagingSenderId: "527073397937",
+  appId: "1:527073397937:web:9f0f235a36f81fc4636690",
+  measurementId: "G-EXZH3SNX10"
 };
-
 // Инициализация Firebase
 const app = initializeApp(firebaseConfig);
 

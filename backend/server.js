@@ -27,7 +27,7 @@ const loginLimiter = rateLimit({
 
 // CORS
 const corsOptions = {
-  origin: "https://projectd-9c1fa.web.app",
+  origin: "http://localhost:5173",
   methods: ["GET", "POST", "OPTIONS"],
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization"],
@@ -44,20 +44,22 @@ app.use((req, res, next) => {
   next();
 });
 
-// CSRF-защита
-app.use((req, res, next) => {
-  const referer = req.get("Referer");
-  if (req.path.startsWith("/api") && referer && !referer.includes("projectd-9c1fa.web.app")) {
-    return res.status(403).send("Forbidden: Invalid Referer");
-  }
-  next();
-});
+// // CSRF-защита
+// app.use((req, res, next) => {
+//   const referer = req.get("Referer");
+//   if (req.path.startsWith("/api") && referer && !referer.includes("projectd-9c1fa.web.app")) {
+//     return res.status(403).send("Forbidden: Invalid Referer");
+//   }
+//   next();
+// });
 
 app.use(bodyParser.json());
 
 // Инициализация Firebase Admin
-const serviceAccount = require("./firebase-adminsdk.json");
+delete require.cache[require.resolve('./firebase-adminsdk.json')];
+const serviceAccount = require('./firebase-adminsdk.json');
 
+console.log("🔥 Подключаемся к проекту:", serviceAccount.project_id);
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
@@ -126,12 +128,15 @@ app.post("/api/register", loginLimiter, async (req, res) => {
 app.post("/api/google-login", loginLimiter, async (req, res) => {
   try {
     const { token } = req.body;
-    const decoded = await admin.auth().verifyIdToken(token);
+    console.log("🌐 Запрос на /api/google-login:", token);
 
+    const decoded = await admin.auth().verifyIdToken(token);
     const email = decoded.email;
     const name = decoded.name || "Google User";
     const provider = "google";
     const uid = decoded.uid;
+    const sqlite3 = require("sqlite3").verbose();
+    const db = new sqlite3.Database("users.db");
 
     const existingUser = await db.get("SELECT * FROM users WHERE id = ? OR email = ?", [uid, email]);
 
@@ -149,11 +154,13 @@ app.post("/api/google-login", loginLimiter, async (req, res) => {
     );
 
     res.json({ token: jwtToken });
+
   } catch (error) {
     console.error("Ошибка входа через Google:", error.message);
-    res.status(401).send("Invalid Google token");
+    res.status(401).json({ error: "Invalid Google token", message: error.message });
   }
 });
+
 
 // 📌 Соцвход (Google, Telegram)
 app.post("/api/social-login", loginLimiter, async (req, res) => {
@@ -168,15 +175,29 @@ app.post("/api/social-login", loginLimiter, async (req, res) => {
       if (decodedToken.uid !== id) return res.status(401).send("Invalid Google token");
     } else if (provider === "telegram") {
       const botToken = process.env.TELEGRAM_BOT_TOKEN;
+
+      // 🔍 Логируем пришедшие данные от Telegram
+      console.log("📥 Получен запрос от Telegram:", req.body);
+      console.log("🔑 Используемый botToken:", botToken);
+
       const dataCheckString = Object.keys(req.body)
         .filter((key) => key !== "hash" && key !== "provider" && key !== "token")
         .sort()
         .map((key) => `${key}=${req.body[key]}`)
         .join("\n");
+
+      console.log("📦 Сформированная строка для hash:", dataCheckString);
+
       const secretKey = crypto.createHash("sha256").update(botToken).digest();
       const calculatedHash = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
 
-      if (calculatedHash !== hash) return res.status(401).send("Invalid Telegram hash");
+      console.log("🔐 calculatedHash:", calculatedHash);
+      console.log("🔐 hash из Telegram:", hash);
+
+      if (calculatedHash !== hash) {
+        console.error("❌ Hash mismatch! Telegram вход отклонён.");
+        return res.status(401).send("Invalid Telegram hash");
+      }
     } else {
       return res.status(400).send("Unsupported provider");
     }
@@ -205,6 +226,7 @@ app.post("/api/social-login", loginLimiter, async (req, res) => {
     res.status(400).send(error.message);
   }
 });
+
 
 // 📌 Профиль
 app.get("/api/profile", async (req, res) => {
