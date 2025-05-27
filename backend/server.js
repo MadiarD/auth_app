@@ -27,7 +27,7 @@ const loginLimiter = rateLimit({
 
 // CORS
 const corsOptions = {
-  origin: "http://localhost:5173",
+  origin: "https://auth-1ba03.web.app/",
   methods: ["GET", "POST", "OPTIONS"],
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization"],
