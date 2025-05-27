@@ -81,17 +81,13 @@ const Login = () => {
   // Глобальная функция Telegram
   window.onTelegramAuth = async function (user) {
     try {
-      const response = await fetch(`${API}/api/social-login`, {
+      const res = await fetch(`${API}/api/social-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: user.id,
-          name: user.first_name,
-          username: user.username,
-          provider: 'telegram',
-          email: user.email || null,
-          hash: user.hash,
-        }),
+          ...user,          
+          provider: 'telegram'
+        })
       });
 
       const data = await response.json();

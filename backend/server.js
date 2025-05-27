@@ -10,6 +10,7 @@ const axios = require("axios");
 const rateLimit = require("express-rate-limit");
 
 const app = express();
+app.set('trust proxy', 1); 
 const PORT = process.env.PORT || 3001;
 
 // Проверка переменных окружения
@@ -27,7 +28,7 @@ const loginLimiter = rateLimit({
 
 // CORS
 const corsOptions = {
-  origin: "https://auth-1ba03.web.app/",
+  origin: "https://auth-1ba03.web.app",
   methods: ["GET", "POST", "OPTIONS"],
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization"],
@@ -163,67 +164,68 @@ app.post("/api/google-login", loginLimiter, async (req, res) => {
 
 
 // 📌 Соцвход (Google, Telegram)
-app.post("/api/social-login", loginLimiter, async (req, res) => {
-  const { id, name, username, provider, email, token, hash } = req.body;
+app.post('/api/social-login', loginLimiter, async (req, res) => {
+  const {
+    id,
+    first_name,
+    last_name,
+    username,
+    photo_url,
+    auth_date,
+    hash,
+    provider,
+    token,
+    email
+  } = req.body;
 
   try {
-    validateInput({ id, name, provider }, ["id", "name", "provider"]);
-    let isAdmin = email === "mkoishyn@mail.ru";
+    validateInput({ id: String(id), first_name, provider }, ['id', 'first_name', 'provider']);
+    const displayName = `${first_name}${last_name ? ' ' + last_name : ''}`;
+    const isAdmin = email === 'mkoishyn@mail.ru';
 
-    if (provider === "google") {
-      const decodedToken = await admin.auth().verifyIdToken(token);
-      if (decodedToken.uid !== id) return res.status(401).send("Invalid Google token");
-    } else if (provider === "telegram") {
+    if (provider === 'google') {
+      const decoded = await admin.auth().verifyIdToken(token);
+      if (decoded.uid !== id) return res.status(401).json({ error: 'Invalid Google token' });
+    } else if (provider === 'telegram') {
       const botToken = process.env.TELEGRAM_BOT_TOKEN;
 
-      // 🔍 Логируем пришедшие данные от Telegram
-      console.log("📥 Получен запрос от Telegram:", req.body);
-      console.log("🔑 Используемый botToken:", botToken);
-
       const dataCheckString = Object.keys(req.body)
-        .filter((key) => key !== "hash" && key !== "provider" && key !== "token")
+        .filter((k) => !['hash', 'provider', 'token'].includes(k))
         .sort()
-        .map((key) => `${key}=${req.body[key]}`)
-        .join("\n");
+        .map((k) => `${k}=${req.body[k]}`)
+        .join('\n');
 
-      console.log("📦 Сформированная строка для hash:", dataCheckString);
+      const secretKey = crypto.createHash('sha256').update(botToken).digest();
+      const calcHash  = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
-      const secretKey = crypto.createHash("sha256").update(botToken).digest();
-      const calculatedHash = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
+      if (calcHash !== hash)
+        return res.status(401).json({ error: 'Invalid Telegram hash' });
+    } else {
+      return res.status(400).json({ error: 'Unsupported provider' });
+    }
 
-      console.log("🔐 calculatedHash:", calculatedHash);
-      console.log("🔐 hash из Telegram:", hash);
+    // сохранить / обновить пользователя
+    db.get('SELECT * FROM users WHERE id = ? OR email = ?', [id, email || null], (err, row) => {
+      if (err) return res.status(500).json({ error: 'DB error' });
 
-      if (calculatedHash !== hash) {
-        console.error("❌ Hash mismatch! Telegram вход отклонён.");
-        return res.status(401).send("Invalid Telegram hash");
+      if (!row) {
+        db.run(
+          'INSERT INTO users (id, name, username, email, provider, isAdmin) VALUES (?,?,?,?,?,?)',
+          [id, displayName, username || null, email || null, provider, isAdmin]
+        );
+      } else {
+        db.run('UPDATE users SET isAdmin = ? WHERE id = ?', [isAdmin, id]);
       }
-    } else {
-      return res.status(400).send("Unsupported provider");
-    }
 
-    const existingUser = await db.get("SELECT * FROM users WHERE id = ? OR email = ?", [
-      id,
-      email || null,
-    ]);
-
-    if (!existingUser) {
-      await db.run(
-        "INSERT INTO users (id, name, username, email, provider, isAdmin) VALUES (?, ?, ?, ?, ?, ?)",
-        [id, name, username || null, email || null, provider, isAdmin]
+      const jwtToken = jwt.sign(
+        { id, name: displayName, email, provider, isAdmin },
+        process.env.JWT_SECRET,
+        { expiresIn: '1h' }
       );
-    } else {
-      await db.run("UPDATE users SET isAdmin = ? WHERE id = ?", [isAdmin, id]);
-    }
-
-    const jwtToken = jwt.sign({ id, name, email, provider, isAdmin }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
+      res.json({ token: jwtToken, isAdmin });
     });
-
-    res.json({ token: jwtToken, isAdmin });
-  } catch (error) {
-    console.error("Ошибка входа через соцсеть:", error.message);
-    res.status(400).send(error.message);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
   }
 });
 
