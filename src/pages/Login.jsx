@@ -95,6 +95,7 @@ const Login = () => {
         localStorage.setItem('token', data.token);
         navigate('/profile');
       } else {
+        console.log(data)
         setError('Ошибка Telegram-входа');
       }
     } catch (err) {

@@ -143,8 +143,8 @@ app.post("/api/google-login", loginLimiter, async (req, res) => {
 
     if (!existingUser) {
       await db.run(
-        "INSERT INTO users (id, name, email, provider, isAdmin) VALUES (?, ?, ?, ?, ?)",
-        [uid, name, email, provider, email === "mkoishyn@mail.ru"]
+        "INSERT INTO users (id, name, username, email, provider, isAdmin) VALUES (?, ?, ?, ?, ?, ?)",
+        [uid, name, null ,email, provider, email === "mkoishyn@mail.ru"]
       );
     }
 
@@ -165,6 +165,9 @@ app.post("/api/google-login", loginLimiter, async (req, res) => {
 
 // 📌 Соцвход (Google, Telegram)
 app.post('/api/social-login', loginLimiter, async (req, res) => {
+  const sqlite3 = require('sqlite3').verbose();
+  const db = new sqlite3.Database('users.db');
+
   const {
     id,
     first_name,
