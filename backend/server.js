@@ -239,7 +239,7 @@ app.get("/api/profile", async (req, res) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await db.get("SELECT * FROM users WHERE id = ?", [decoded.id]);
-    if (!user) return res.status(404).send("User not found");
+    if (!user) {return res.status(404).send("User not found");}
     res.json({
       id: user.id,
       name: user.name,
