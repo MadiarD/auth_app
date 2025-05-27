@@ -7,8 +7,9 @@ export default function Profile() {
     const token = localStorage.getItem("token");
 
     if (!token) return;
+    const API = import.meta.env.VITE_API_URL;
 
-    fetch("https://secure-shop.onrender.com/api/profile", {
+    fetch(`${API}/api/profile`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },

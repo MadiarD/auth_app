@@ -90,7 +90,7 @@ const Login = () => {
         })
       });
 
-      const data = await response.json();
+      const data = await res.json();
       if (data.token) {
         localStorage.setItem('token', data.token);
         navigate('/profile');
