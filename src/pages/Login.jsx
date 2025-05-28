@@ -27,31 +27,29 @@ const Login = () => {
   }, []);
 
   
+  // Login.jsx
   const handleEmailLogin = async (e) => {
     e.preventDefault();
-    try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      const user = result.user;
-      const token = await user.getIdToken();
+    const API = import.meta.env.VITE_API_URL;
 
-      const response = await fetch(`${API}/api/login`, {
+    try {
+      const res = await fetch(`${API}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ email, password })
       });
 
-      const data = await response.json();
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-        navigate('/profile');
-      } else {
-        setError('Ошибка сервера при авторизации');
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ошибка сервера');
+
+      localStorage.setItem('token',  data.token);
+      localStorage.setItem('isAdmin', data.isAdmin);
+      navigate('/profile');
     } catch (err) {
-      console.error('Ошибка входа:', err);
-      setError('Неверный email или пароль');
+      setError(err.message);
     }
   };
+
 
   const handleGoogleLogin = async () => {
     try {

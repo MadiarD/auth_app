@@ -10,13 +10,24 @@ export default function Profile() {
     const API = import.meta.env.VITE_API_URL;
 
     fetch(`${API}/api/profile`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-      .then((res) => res.json())
-      .then((data) => setUser(data))
-      .catch((err) => console.error("Ошибка загрузки профиля:", err));
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            const msg = await res.text();     
+            throw new Error(msg);
+          }
+          return res.json();
+        })
+        .then(setUser)
+        .catch((err) => {
+          console.error(err.message);
+          if (err.message === 'Invalid token') {
+            console.log(token)
+            localStorage.removeItem('token');
+          }
+        });
+
   }, []);
 
   if (!user) return <p className="text-center mt-10">Загрузка...</p>;
