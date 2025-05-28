@@ -37,7 +37,7 @@ export default function Profile() {
       <h2 className="text-2xl font-semibold mb-4">Профиль пользователя</h2>
       <div className="bg-white dark:bg-gray-800 p-6 rounded shadow">
         <img
-          src="https://via.placeholder.com/100"
+          src="https://cdn1.iconfinder.com/data/icons/avatars-1-5/136/87-1024.png"
           alt="Аватар"
           className="rounded-full mb-4"
         />
