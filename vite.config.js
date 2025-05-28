@@ -5,7 +5,7 @@ export default defineConfig({
     outDir: 'dist',
   },
   server: {
-    allowedHosts: ['...'],
+    allowedHosts: ['...','.gim38.kz','217.114.10.194'],
   },
   envPrefix: 'VITE_',
 });
