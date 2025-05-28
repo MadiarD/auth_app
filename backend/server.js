@@ -8,7 +8,7 @@ const admin = require("firebase-admin");
 const crypto = require("crypto");
 const axios = require("axios");
 const rateLimit = require("express-rate-limit");
-
+const db = require('./users/db');
 const app = express();
 app.set('trust proxy', 1); 
 const PORT = process.env.PORT || 3001;
@@ -75,27 +75,35 @@ const validateInput = (data, requiredFields) => {
 };
 
 // 📌 Вход по email/паролю
-app.post("/api/login", loginLimiter, async (req, res) => {
+app.post('/api/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body;
   try {
-    validateInput({ email, password }, ["email", "password"]);
-    const user = await db.get("SELECT * FROM users WHERE email = ?", [email]);
-    if (!user) return res.status(404).send("Пользователь не найден");
+    validateInput({ email, password }, ['email', 'password']);
 
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.status(401).send("Неверный пароль");
+    const user = await db.getAsync(
+      'SELECT * FROM users WHERE email = ?', [email]
+    );
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
 
-    const isAdmin = email === "mkoishyn@mail.ru";
-    await db.run("UPDATE users SET isAdmin = ? WHERE email = ?", [isAdmin, email]);
+    const ok = await bcrypt.compare(password, user.password);
+    if (!ok)  return res.status(401).json({ error: 'Неверный пароль' });
 
-    const token = jwt.sign({ id: user.id, email, isAdmin }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
-    });
+    const isAdmin = email === 'mkoishyn@mail.ru';
+    await db.runAsync(
+      'UPDATE users SET isAdmin = ? WHERE email = ?',
+      [isAdmin, email]
+    );
 
-    res.json({ token, isAdmin });
-  } catch (error) {
-    console.error("Ошибка входа:", error.message);
-    res.status(400).send(error.message);
+    const jwtToken = jwt.sign(
+      { id: user.id, email, isAdmin },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    res.json({ token: jwtToken, isAdmin });
+  } catch (e) {
+    console.error('Ошибка входа:', e.message);
+    res.status(400).json({ error: e.message });
   }
 });
 
@@ -136,8 +144,7 @@ app.post("/api/google-login", loginLimiter, async (req, res) => {
     const name = decoded.name || "Google User";
     const provider = "google";
     const uid = decoded.uid;
-    const sqlite3 = require("sqlite3").verbose();
-    const db = new sqlite3.Database("users.db");
+ 
 
     const existingUser = await db.get("SELECT * FROM users WHERE id = ? OR email = ?", [uid, email]);
 
@@ -165,8 +172,7 @@ app.post("/api/google-login", loginLimiter, async (req, res) => {
 
 // 📌 Соцвход (Google, Telegram)
 app.post('/api/social-login', loginLimiter, async (req, res) => {
-  const sqlite3 = require('sqlite3').verbose();
-  const db = new sqlite3.Database('users.db');
+
 
   const {
     id,
@@ -234,23 +240,31 @@ app.post('/api/social-login', loginLimiter, async (req, res) => {
 
 
 // 📌 Профиль
-app.get("/api/profile", async (req, res) => {
-  const token = req.headers.authorization?.split(" ")[1];
+app.get('/api/profile', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'No token' });
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await db.get("SELECT * FROM users WHERE id = ?", [decoded.id]);
-    if (!user) {return res.status(404).send("User not found");}
-    res.json({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      provider: user.provider,
-      isAdmin: user.isAdmin,
-    });
-  } catch (error) {
-    res.status(401).send("Invalid token");
+
+    const user = await db.getAsync(
+      'SELECT id, name, email, provider, isAdmin FROM users WHERE id = ?',
+      [decoded.id]
+    );
+    if (!user) {
+      await db.runAsync(
+        'INSERT INTO users (id, name, provider) VALUES (?,?,?)',
+        [decoded.id, decoded.name || 'User', decoded.provider || 'google']
+      );
+      return res.json({ id: decoded.id, name: decoded.name, email: decoded.email });
+    }
+
+    res.json(user);
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
   }
 });
+
 
 // 📌 Подключение дополнительных маршрутов (например, save-user)
 const userRoutes = require("./users");
